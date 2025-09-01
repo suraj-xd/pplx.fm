@@ -16,7 +16,7 @@ export default async function Image() {
   try {
     // Use the existing og-image.png from public folder
     const imageData = await readFile(
-      join(process.cwd(), "public/og/image.png")
+      join(process.cwd(), "public/og/og-image.webp")
     );
 
     return new Response(imageData as unknown as BodyInit, {
