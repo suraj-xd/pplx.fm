@@ -7,6 +7,9 @@ import styles from './crt-screen.module.css'
 interface YouTubeLivePlayerProps {
   videoId: string
   className?: string
+  playerRef?: React.MutableRefObject<any>
+  onPlayingChange?: (playing: boolean) => void
+  onReady?: () => void
 }
 
 declare global {
@@ -16,23 +19,28 @@ declare global {
   }
 }
 
-export default function YouTubeLivePlayer({ videoId, className = '' }: YouTubeLivePlayerProps) {
-  const playerRef = useRef<any>(null)
+export default function YouTubeLivePlayer({ videoId, className = '', playerRef: externalPlayerRef, onPlayingChange, onReady }: YouTubeLivePlayerProps) {
+  const internalPlayerRef = useRef<any>(null)
+  const playerRef = externalPlayerRef || internalPlayerRef
   const containerRef = useRef<HTMLDivElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isReady, setIsReady] = useState(false)
   const [hasUserInteracted, setHasUserInteracted] = useState(false)
   const [showPrompt, setShowPrompt] = useState(false)
+  const [isIOS, setIsIOS] = useState(false)
+  const [isMuted, setIsMuted] = useState(true)
 
   const initPlayer = () => {
     if (!window.YT || !containerRef.current) return
 
-    playerRef.current = new window.YT.Player(containerRef.current, {
+    const iOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
+
+    const player = new window.YT.Player(containerRef.current, {
       videoId: videoId,
       width: '100%',
       height: '100%',
       playerVars: {
-        autoplay: 1,
+        autoplay: iOSDevice ? 0 : 1, // Disable autoplay on iOS
         mute: 1, // Start muted for guaranteed autoplay
         controls: 0,
         showinfo: 0,
@@ -44,7 +52,7 @@ export default function YouTubeLivePlayer({ videoId, className = '' }: YouTubeLi
         cc_load_policy: 0,
         iv_load_policy: 3,
         autohide: 1,
-        playsinline: 1,
+        playsinline: 1, // Critical for iOS
         disablekb: 1,
         origin: window.location.origin,
         enablejsapi: 1,
@@ -52,36 +60,55 @@ export default function YouTubeLivePlayer({ videoId, className = '' }: YouTubeLi
       },
       events: {
         onReady: (event: any) => {
+          // Store the player instance in both refs
+          playerRef.current = event.target
+          if (externalPlayerRef) {
+            externalPlayerRef.current = event.target
+          }
+          
           setIsReady(true)
           event.target.mute() // Ensure muted first
           event.target.setVolume(100)
-          event.target.playVideo()
-          setIsPlaying(true)
           
-          // Try to unmute after a delay
-          setTimeout(() => {
-            if (event.target.unMute) {
-              event.target.unMute()
-              console.log('Attempting to unmute...')
-            }
-          }, 1000)
+          // Notify parent that player is ready
+          onReady?.()
+          
+          if (iOSDevice) {
+            // On iOS, don't show overlay - rely on the play button in header
+            console.log('iOS detected - player ready for manual control')
+            // Don't set showPrompt on iOS since we have the header button
+          } else {
+            // Non-iOS devices can attempt autoplay
+            event.target.playVideo()
+            setIsPlaying(true)
+            
+            // Try to unmute after a delay for non-iOS
+            setTimeout(() => {
+              if (event.target.unMute && !iOSDevice) {
+                event.target.unMute()
+                console.log('Attempting to unmute...')
+              }
+            }, 1000)
+          }
         },
         onStateChange: (event: any) => {
+          console.log('YouTube player state changed:', event.data);
           if (event.data === window.YT.PlayerState.PLAYING) {
+            console.log('Player is now playing');
             setIsPlaying(true)
-            // Try to unmute on every play
-            setTimeout(() => {
-              if (!hasUserInteracted && playerRef.current) {
-                try {
-                  playerRef.current.unMute()
-                  setHasUserInteracted(true)
-                } catch (e) {
-                  // User interaction still needed
-                }
-              }
-            }, 100)
+            onPlayingChange?.(true)
+            // Check mute state
+            if (playerRef.current && playerRef.current.isMuted) {
+              setIsMuted(playerRef.current.isMuted())
+            }
           } else if (event.data === window.YT.PlayerState.PAUSED) {
+            console.log('Player is now paused');
             setIsPlaying(false)
+            onPlayingChange?.(false)
+          } else if (event.data === window.YT.PlayerState.ENDED) {
+            console.log('Player has ended');
+            setIsPlaying(false)
+            onPlayingChange?.(false)
           }
         },
         onError: (error: any) => {
@@ -89,6 +116,12 @@ export default function YouTubeLivePlayer({ videoId, className = '' }: YouTubeLi
         }
       }
     })
+    
+    // Store player immediately after creation
+    playerRef.current = player
+    if (externalPlayerRef) {
+      externalPlayerRef.current = player
+    }
   }
 
   useEffect(() => {
@@ -114,86 +147,32 @@ export default function YouTubeLivePlayer({ videoId, className = '' }: YouTubeLi
     }
   }, [videoId])
 
-  const togglePlayPause = () => {
-    if (!playerRef.current) return
 
-    if (isPlaying) {
-      playerRef.current.pauseVideo()
-    } else {
-      playerRef.current.unMute()
-      playerRef.current.playVideo()
-      setHasUserInteracted(true)
-    }
-  }
-
-  const goToLive = () => {
-    if (!playerRef.current) return
-    
-    // For live streams, seek to the live edge
-    const duration = playerRef.current.getDuration()
-    if (duration) {
-      playerRef.current.seekTo(duration, true)
-      playerRef.current.playVideo()
-      setIsPlaying(true)
-    }
-  }
 
   // Ensure autoplay starts when player is ready
   useEffect(() => {
     if (!isReady || !playerRef.current) return
     
-    // Force play if not already playing
-    const checkAndPlay = setTimeout(() => {
-      if (playerRef.current && playerRef.current.getPlayerState) {
-        const state = playerRef.current.getPlayerState()
-        if (state !== window.YT?.PlayerState?.PLAYING) {
-          playerRef.current.mute()
-          playerRef.current.playVideo()
-          console.log('Forcing autoplay...')
-        }
-      }
-    }, 500)
-
-    // Aggressive unmute attempts
-    const attempts = [1000, 1500, 2000, 3000, 5000]
-    const timeouts: NodeJS.Timeout[] = []
-    let successfulUnmute = false
-
-    attempts.forEach((delay, index) => {
-      const timeout = setTimeout(() => {
-        if (playerRef.current && !hasUserInteracted && !successfulUnmute) {
-          try {
-            playerRef.current.unMute()
-            playerRef.current.setVolume(100)
-            
-            // Check if unmute was successful
-            if (playerRef.current.isMuted && !playerRef.current.isMuted()) {
-              setHasUserInteracted(true)
-              successfulUnmute = true
-              console.log(`Audio unmuted successfully after ${delay}ms`)
-              // Clear remaining timeouts
-              timeouts.forEach(t => clearTimeout(t))
-            } else if (index === attempts.length - 1) {
-              // Last attempt failed, show prompt
-              console.log('All unmute attempts failed, showing prompt')
-              setShowPrompt(true)
-            }
-          } catch (e) {
-            console.log(`Unmute attempt at ${delay}ms failed`)
-            if (index === attempts.length - 1) {
-              setShowPrompt(true)
-            }
+    const iOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
+    
+    // Only attempt autoplay on non-iOS devices
+    if (!iOSDevice) {
+      const checkAndPlay = setTimeout(() => {
+        if (playerRef.current && playerRef.current.getPlayerState) {
+          const state = playerRef.current.getPlayerState()
+          if (state !== window.YT?.PlayerState?.PLAYING) {
+            playerRef.current.mute()
+            playerRef.current.playVideo()
+            console.log('Attempting autoplay...')
           }
         }
-      }, delay)
-      timeouts.push(timeout)
-    })
+      }, 500)
 
-    return () => {
-      clearTimeout(checkAndPlay)
-      timeouts.forEach(t => clearTimeout(t))
+      return () => {
+        clearTimeout(checkAndPlay)
+      }
     }
-  }, [isReady, hasUserInteracted])
+  }, [isReady])
 
   return (
     <>
@@ -224,22 +203,27 @@ export default function YouTubeLivePlayer({ videoId, className = '' }: YouTubeLi
             <div 
               className={styles.clickPrompt}
               onClick={() => {
+                console.log('Click prompt clicked, starting playback...');
                 if (playerRef.current) {
                   playerRef.current.unMute()
                   playerRef.current.setVolume(100)
                   playerRef.current.playVideo()
                   setHasUserInteracted(true)
                   setShowPrompt(false)
+                  setIsMuted(false)
+                  onPlayingChange?.(true)
                 }
               }}
             >
               <div className={styles.promptText}>
-                <span>Click to enable audio</span>
+                <span>Click to play</span>
               </div>
             </div>
           )}
         </div>
       </div>
+      
+
     </>
   )
 }

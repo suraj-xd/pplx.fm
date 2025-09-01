@@ -26,9 +26,67 @@ export default function CRTScreen({
 }: CRTScreenProps) {
   const [isOn, setIsOn] = useState(false);
   const [activeMenuIndex, setActiveMenuIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   const textRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<any>(null);
+
+  const togglePlayPause = () => {
+    console.log('Toggle play/pause clicked', { 
+      playerReady: isPlayerReady, 
+      playerRef: playerRef.current,
+      isPlaying 
+    });
+    
+    if (!playerRef.current) {
+      console.log('Player not ready yet');
+      return;
+    }
+    
+    try {
+      // Get the actual player state instead of relying on our state
+      const playerState = playerRef.current.getPlayerState ? playerRef.current.getPlayerState() : -1;
+      const isActuallyPlaying = playerState === 1; // YT.PlayerState.PLAYING = 1
+      
+      console.log('Player state:', playerState, 'isActuallyPlaying:', isActuallyPlaying);
+      
+      if (isActuallyPlaying) {
+        console.log('Attempting to pause...');
+        if (playerRef.current.pauseVideo) {
+          playerRef.current.pauseVideo();
+          setIsPlaying(false);
+        } else {
+          console.error('pauseVideo method not found');
+        }
+      } else {
+        console.log('Attempting to play...');
+        // Jump to live when resuming
+        if (playerRef.current.getDuration && playerRef.current.seekTo) {
+          const duration = playerRef.current.getDuration();
+          if (duration && duration > 0) {
+            console.log('Seeking to live position:', duration);
+            playerRef.current.seekTo(duration, true);
+          }
+        }
+        
+        if (playerRef.current.playVideo) {
+          playerRef.current.playVideo();
+          setIsPlaying(true);
+        } else {
+          console.error('playVideo method not found');
+        }
+        
+        // Try to unmute for better experience
+        if (playerRef.current.unMute) {
+          playerRef.current.unMute();
+        }
+      }
+    } catch (error) {
+      console.error('Error controlling player:', error);
+    }
+  };
 
   useEffect(() => {
     if (autoTurnOn) {
@@ -115,9 +173,36 @@ export default function CRTScreen({
         <div className={styles.overlay}>
           <div className={styles.text} ref={textRef}>
             <span>pplx.fm</span>
+            <button 
+              className={styles.playButton}
+              onClick={togglePlayPause}
+              disabled={!isPlayerReady}
+              aria-label={isPlaying ? 'Pause' : 'Play from live'}
+              title={!isPlayerReady ? 'Loading player...' : (isPlaying ? 'Pause' : 'Play from live')}
+            >
+              {isPlaying ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16" />
+                  <rect x="14" y="4" width="4" height="16" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </button>
           </div>
             {liveVideoId && (
-              <YouTubeLivePlayer videoId={liveVideoId} className="" />
+              <YouTubeLivePlayer 
+                videoId={liveVideoId} 
+                className=""
+                playerRef={playerRef}
+                onPlayingChange={setIsPlaying}
+                onReady={() => {
+                  console.log('Player ready notification received');
+                  setIsPlayerReady(true);
+                }}
+              />
             )}
           {/* <div className={styles.menu}>
             <header>Main Menu</header>

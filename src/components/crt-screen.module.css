@@ -206,8 +206,12 @@ body {
   position: absolute;
   text-shadow: 0 0 3px lime;
   top: 10%;
-  width: 200px;
+  width: 90dvw;
   z-index: 10;
+  display: flex;
+  justify-items:baseline;
+  align-items:center;
+  gap: 10px;
 }
 
 .on .text,
@@ -264,6 +268,39 @@ body {
   100% {
     transform: scale(0, 0);
   }
+}
+
+.playButton {
+  background: none;
+  border: none;
+  color: lime;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: blur(0.5px);
+  text-shadow: 0 0 3px lime;
+  transition: all 0.2s;
+  margin-left: auto;
+  animation: blur 30ms infinite, jerk 50ms infinite;
+}
+
+.playButton:hover:not(:disabled) {
+  color: #00ff00;
+  text-shadow: 0 0 5px lime;
+  transform: scale(1.1);
+}
+
+.playButton:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.playButton svg {
+  width: 20px;
+  height: 20px;
+  filter: drop-shadow(0 0 2px lime);
 }
 
 .text span {
