@@ -1,0 +1,83 @@
+@font-face {
+  src: url('https://s3-us-west-2.amazonaws.com/s.cdpn.io/86186/sys.ttf') format('truetype');
+  font-family: 'Sys';
+}
+
+.footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 95%;
+  z-index: 20;
+  padding: 1rem 2rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
+  opacity: 0;
+  animation: fadeIn 10ms ease 2500ms forwards;
+}
+
+.footerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  font-family: "Sys", monospace;
+  font-size: 10px;
+  color: rgba(0, 255, 0, 0.306);
+    /* text-transform: uppercase; */
+  /* text-shadow: 0 0 3px rgba(0, 255, 0, 0.449); */
+  filter: blur(0.5px);
+}
+
+.leftSection,
+.rightSection {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.link {
+  color: rgba(0, 255, 0, 0.306);
+    text-decoration: none;
+  transition: all 0.2s;
+  position: relative;
+}
+
+
+
+
+.link:hover::after {
+  width: 100%;
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  color: rgba(0, 255, 0, 0.306);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .footer {
+    padding: 0.75rem 1rem;
+  }
+  
+  .footerContent {
+    font-size: 12px;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .leftSection,
+  .rightSection {
+    justify-content: center;
+  }
+}
