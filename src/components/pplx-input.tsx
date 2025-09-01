@@ -29,7 +29,7 @@ function PplxInputComponent() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask anything..."
+          placeholder="Whats on your mind?"
           className={styles.retroInput}
         />
         <button
