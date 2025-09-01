@@ -39,7 +39,7 @@ function Footer() {
               </a>
           <span> by </span>
           <a
-            href="https://github.com/suraj-xd"
+            href="https://surajgaud.com"
             target="_blank"
             rel="noopener noreferrer"
             className={styles.link}
