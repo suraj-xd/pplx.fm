@@ -19,7 +19,7 @@ export default async function Image() {
       join(process.cwd(), "public/og/image.png")
     );
 
-    return new Response(imageData, {
+    return new Response(imageData as unknown as BodyInit, {
       headers: {
         "Content-Type": "image/png",
       },
