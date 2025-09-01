@@ -1,11 +1,19 @@
 'use client';
 
-import { useState, KeyboardEvent } from 'react';
+import { useState, KeyboardEvent, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import styles from './pplx-input.module.css';
 
 function PplxInputComponent() {
   const [query, setQuery] = useState('');
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSubmit = () => {
     if (query.trim()) {
@@ -21,11 +29,18 @@ function PplxInputComponent() {
   };
 
   return (
-    <div className={styles.retroInputContainer}>
+    <div 
+      className={styles.retroInputContainer}
+      style={{
+        opacity: isVisible ? 1 : 0,
+        transition: 'opacity 0.5s ease-in-out',
+        pointerEvents: isVisible ? 'auto' : 'none'
+      }}
+    >
       <div className={styles.retroInputWrapper}>
         <input
           type="text"
-          autoFocus
+          autoFocus={isVisible}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}

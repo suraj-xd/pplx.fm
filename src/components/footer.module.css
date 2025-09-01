@@ -80,4 +80,7 @@
   .rightSection {
     justify-content: center;
   }
+  .leftSection{
+    visibility: hidden;
+  }
 }
