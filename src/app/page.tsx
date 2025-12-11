@@ -7,7 +7,7 @@ export default function Page() {
     <CRTScreen 
       autoTurnOn={true}
       turnOnDelay={1000}
-      liveVideoId="W_rCivF3-Eo"
+      liveVideoId="68GazB-6hcs"
       >
         <PplxInput/>
       </CRTScreen>
