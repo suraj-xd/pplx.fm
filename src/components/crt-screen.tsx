@@ -33,6 +33,32 @@ export default function CRTScreen({
   const textRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
 
+  const getYouTubePlayer = () => {
+    const candidate = playerRef.current;
+
+    if (!candidate) return null;
+
+    if (
+      typeof candidate.playVideo === "function" ||
+      typeof candidate.pauseVideo === "function" ||
+      typeof candidate.getPlayerState === "function"
+    ) {
+      return candidate;
+    }
+
+    if (
+      candidate.target &&
+      (typeof candidate.target.playVideo === "function" ||
+        typeof candidate.target.pauseVideo === "function" ||
+        typeof candidate.target.getPlayerState === "function")
+    ) {
+      playerRef.current = candidate.target;
+      return candidate.target;
+    }
+
+    return null;
+  };
+
   const togglePlayPause = () => {
     console.log('Toggle play/pause clicked', { 
       playerReady: isPlayerReady, 
@@ -40,22 +66,24 @@ export default function CRTScreen({
       isPlaying 
     });
     
-    if (!playerRef.current) {
+    const player = getYouTubePlayer();
+
+    if (!player) {
       console.log('Player not ready yet');
       return;
     }
     
     try {
       // Get the actual player state instead of relying on our state
-      const playerState = playerRef.current.getPlayerState ? playerRef.current.getPlayerState() : -1;
+      const playerState = player.getPlayerState ? player.getPlayerState() : -1;
       const isActuallyPlaying = playerState === 1; // YT.PlayerState.PLAYING = 1
       
       console.log('Player state:', playerState, 'isActuallyPlaying:', isActuallyPlaying);
       
       if (isActuallyPlaying) {
         console.log('Attempting to pause...');
-        if (playerRef.current.pauseVideo) {
-          playerRef.current.pauseVideo();
+        if (player.pauseVideo) {
+          player.pauseVideo();
           setIsPlaying(false);
         } else {
           console.error('pauseVideo method not found');
@@ -63,24 +91,28 @@ export default function CRTScreen({
       } else {
         console.log('Attempting to play...');
         // Jump to live when resuming
-        if (playerRef.current.getDuration && playerRef.current.seekTo) {
-          const duration = playerRef.current.getDuration();
+        if (player.getDuration && player.seekTo) {
+          const duration = player.getDuration();
           if (duration && duration > 0) {
             console.log('Seeking to live position:', duration);
-            playerRef.current.seekTo(duration, true);
+            player.seekTo(duration, true);
           }
         }
+
+        // This runs during a real click, so production browsers allow audio here.
+        if (player.unMute) {
+          player.unMute();
+        }
+
+        if (player.setVolume) {
+          player.setVolume(100);
+        }
         
-        if (playerRef.current.playVideo) {
-          playerRef.current.playVideo();
+        if (player.playVideo) {
+          player.playVideo();
           setIsPlaying(true);
         } else {
           console.error('playVideo method not found');
-        }
-        
-        // Try to unmute for better experience
-        if (playerRef.current.unMute) {
-          playerRef.current.unMute();
         }
       }
     } catch (error) {
