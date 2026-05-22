@@ -24,6 +24,7 @@ export default function YouTubeLivePlayer({ videoId, className = '', playerRef: 
   const playerRef = externalPlayerRef || internalPlayerRef
   const containerRef = useRef<HTMLDivElement>(null)
   const hasInitializedRef = useRef(false)
+  const hasSeekToLiveRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isReady, setIsReady] = useState(false)
   const [hasUserInteracted, setHasUserInteracted] = useState(false)
@@ -77,22 +78,26 @@ export default function YouTubeLivePlayer({ videoId, className = '', playerRef: 
             onReady?.()
 
             if (iOSDevice) {
-              // On iOS, don't show overlay - rely on the play button in header
               console.log('iOS detected - player ready for manual control')
-              // Don't set showPrompt on iOS since we have the header button
             } else {
-              // Production browsers allow autoplay only while muted. Sound starts after a user click.
               event.target.playVideo()
-              setIsPlaying(true)
             }
           },
           onStateChange: (event: any) => {
             console.log('YouTube player state changed:', event.data);
             if (event.data === window.YT.PlayerState.PLAYING) {
               console.log('Player is now playing');
+              if (!hasSeekToLiveRef.current) {
+                hasSeekToLiveRef.current = true
+                const duration = event.target.getDuration?.()
+                const currentTime = event.target.getCurrentTime?.() || 0
+                if (duration && duration > 0 && (duration - currentTime) > 5) {
+                  console.log('Seeking to live edge:', duration)
+                  event.target.seekTo(duration, true)
+                }
+              }
               setIsPlaying(true)
               onPlayingChange?.(true)
-              // Check mute state
               if (playerRef.current && playerRef.current.isMuted) {
                 setIsMuted(playerRef.current.isMuted())
               }
@@ -155,36 +160,44 @@ export default function YouTubeLivePlayer({ videoId, className = '', playerRef: 
 
 
 
-  // Ensure autoplay starts when player is ready
   useEffect(() => {
     if (!isReady || !playerRef.current) return
-    
-    const iOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
-    
-    // Only attempt autoplay on non-iOS devices
-    if (!iOSDevice) {
-      const checkAndPlay = setTimeout(() => {
-        if (playerRef.current && playerRef.current.getPlayerState) {
-          const state = playerRef.current.getPlayerState()
-          if (state !== window.YT?.PlayerState?.PLAYING) {
-            playerRef.current.mute()
-            playerRef.current.playVideo()
-            console.log('Attempting autoplay...')
-          }
-        }
-      }, 500)
 
-      return () => {
-        clearTimeout(checkAndPlay)
+    const iOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
+    if (iOSDevice) return
+
+    let attempts = 0
+    const maxAttempts = 6
+    let timer: NodeJS.Timeout
+
+    const ensurePlaying = () => {
+      if (!playerRef.current?.getPlayerState) return
+      const state = playerRef.current.getPlayerState()
+
+      if (state !== window.YT?.PlayerState?.PLAYING) {
+        playerRef.current.mute()
+        const duration = playerRef.current.getDuration?.()
+        if (duration && duration > 0) {
+          playerRef.current.seekTo(duration, true)
+        }
+        playerRef.current.playVideo()
+        console.log('Autoplay attempt', attempts + 1)
+        attempts++
+        if (attempts < maxAttempts) {
+          timer = setTimeout(ensurePlaying, 1500)
+        }
       }
     }
+
+    timer = setTimeout(ensurePlaying, 800)
+    return () => clearTimeout(timer)
   }, [isReady])
 
   return (
     <>
       <Script 
         src="https://www.youtube.com/iframe_api"
-        strategy="lazyOnload"
+        strategy="afterInteractive"
         onLoad={initPlayer}
       />
       
